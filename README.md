@@ -32,11 +32,30 @@ DATASET_PATH=dataset/videos_vscrowd
 ```
 
 ### Running the Edge Node
-Use `uv` to automatically handle dependencies and run the script:
+Use `uv` to automatically handle dependencies and run the script. The sender supports command-line arguments to override the node ID and select which video folders to stream:
 
 ```bash
 cd edge-node
+
+# Uses defaults from .env (Raspi-1, test_058 & test_059)
 uv run src/sender.py
+
+# Override node ID and video folders
+uv run src/sender.py --node-id Raspi-2 --folders test_060 test_066
+```
+
+### Example: Running Two Nodes Simultaneously
+
+In **Terminal 1**, start the first edge node:
+```bash
+cd edge-node
+uv run src/sender.py --node-id Raspi-1 --folders test_058 test_059
+```
+
+In **Terminal 2**, start the second edge node with different videos:
+```bash
+cd edge-node
+uv run src/sender.py --node-id Raspi-2 --folders test_060 test_066
 ```
 
 ## 2. Main Node Setup

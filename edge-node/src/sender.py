@@ -1,4 +1,6 @@
 import os
+import sys
+import argparse
 import cv2
 import zenoh
 import time
@@ -7,12 +9,18 @@ from pathlib import Path
 
 load_dotenv()
 
-NODE_ID = os.getenv("NODE_ID")
-MAIN_NODE_IP = os.getenv("MAIN_NODE_IP")
-DATASET_PATH = Path(os.getenv("DATASET_PATH")).resolve()
-TARGET_FOLDERS = ["test_062", "test_063"]
+def parse_args():
+    parser = argparse.ArgumentParser(description="Edge node camera stream sender")
+    parser.add_argument("--node-id", default=os.getenv("NODE_ID"), help="Node ID (default: from .env)")
+    parser.add_argument("--folders", nargs="+", default=["test_058", "test_059"], help="Target folders to stream (default: test_058 test_059)")
+    return parser.parse_args()
 
 def main():
+    args = parse_args()
+    NODE_ID = args.node_id
+    MAIN_NODE_IP = os.getenv("MAIN_NODE_IP")
+    DATASET_PATH = Path(os.getenv("DATASET_PATH")).resolve()
+    TARGET_FOLDERS = args.folders
     conf = zenoh.Config()
     
     # Apply the main node IP to ensure direct connection across subnets

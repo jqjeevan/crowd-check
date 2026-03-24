@@ -1,0 +1,5 @@
+# Ignore all data/model folders
+**/models/
+**/storage/
+**/storage/
+*.env

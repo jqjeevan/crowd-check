@@ -4,6 +4,7 @@
 * **Package Manager:** [uv](https://github.com/astral-sh/uv) installed on all machines.
 * **Hardware (Main Node):** An NVIDIA GPU with CUDA support.
 * **Network:** Both nodes must be on the same local network or reachable by IP.
+* **Dataset:** Download Dataset From (https://huggingface.co/datasets/HopLeeTop/VSCrowd/tree/main) and insert into storage folder as outlined in Configuration.
 
 ## Project Structure
 

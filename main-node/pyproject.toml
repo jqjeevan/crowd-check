@@ -9,6 +9,7 @@ dependencies = [
     "torchvision",
     "opencv-python",
     "ultralytics",
+    "PySide6>=6.8.0",
     "eclipse-zenoh>=1.8.0",
     "python-dotenv>=1.2.2",
 ]

@@ -8,4 +8,5 @@ dependencies = [
     "eclipse-zenoh>=1.8.0",
     "opencv-python-headless>=4.13.0.92",
     "python-dotenv>=1.2.2",
+    "ultralytics>=8.4.0",
 ]

@@ -5,6 +5,7 @@ description = "RTX 5070 Ti Computer Vision Node"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "clickhouse-connect",
     "torch",
     "torchvision",
     "opencv-python",

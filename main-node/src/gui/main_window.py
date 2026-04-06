@@ -5,10 +5,23 @@ import cv2
 from PySide6.QtWidgets import QMainWindow, QWidget, QGridLayout
 from PySide6.QtCore import QTimer
 
-from config import STORAGE_BASE
+from config import (
+    CLICKHOUSE_DATABASE,
+    CLICKHOUSE_HOST,
+    CLICKHOUSE_PASSWORD,
+    CLICKHOUSE_PORT,
+    CLICKHOUSE_SECURE,
+    CLICKHOUSE_USERNAME,
+    ENABLE_CLICKHOUSE_SINK,
+    ENABLE_CSV_SINK,
+    STATS_BATCH_SIZE,
+    STATS_FLUSH_INTERVAL_S,
+    STATS_QUEUE_MAX_SIZE,
+    STORAGE_BASE,
+)
 from network import frame_queues
 from detection import process_frame
-from statistics import StatsBuffer
+from statistics import ClickHouseConfig, StatsBuffer
 from gui.camera_widget import CameraWidget
 from gui.theme import WINDOW_BG, GRID_MARGIN, GRID_SPACING
 
@@ -36,9 +49,29 @@ class ReceiverWindow(QMainWindow):
 
         self._cameras: dict[str, CameraWidget] = {}
         self._stats_buffers: dict[str, StatsBuffer] = {}
+        clickhouse_config = None
+        if ENABLE_CLICKHOUSE_SINK:
+            clickhouse_config = ClickHouseConfig(
+                host=CLICKHOUSE_HOST,
+                port=CLICKHOUSE_PORT,
+                database=CLICKHOUSE_DATABASE,
+                username=CLICKHOUSE_USERNAME,
+                password=CLICKHOUSE_PASSWORD,
+                secure=CLICKHOUSE_SECURE,
+            )
+
         for node in node_names:
             self._cameras[node] = CameraWidget()
-            self._stats_buffers[node] = StatsBuffer()
+            self._stats_buffers[node] = StatsBuffer(
+                node,
+                STORAGE_BASE,
+                csv_enabled=ENABLE_CSV_SINK,
+                clickhouse_enabled=ENABLE_CLICKHOUSE_SINK,
+                clickhouse_config=clickhouse_config,
+                batch_size=STATS_BATCH_SIZE,
+                flush_interval_s=STATS_FLUSH_INTERVAL_S,
+                max_queue_size=STATS_QUEUE_MAX_SIZE,
+            )
 
         self._arrange_grid()
 
@@ -108,9 +141,9 @@ class ReceiverWindow(QMainWindow):
     def closeEvent(self, event):
         self._timer.stop()
 
-        # Export all buffered statistics to CSV before shutting down
         for node_name, buf in self._stats_buffers.items():
-            buf.export_csv(node_name, STORAGE_BASE)
+            print(f"[{node_name}] Draining statistics queue before shutdown.")
+            buf.close()
 
         self._zenoh_session.close()
         print("\nShutting down receiver.")

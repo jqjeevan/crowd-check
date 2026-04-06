@@ -1,0 +1,40 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: crowd-check-clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./clickhouse/init:/docker-entrypoint-initdb.d
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: crowd-check-grafana
+    restart: unless-stopped
+    depends_on:
+      - clickhouse
+    environment:
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "9000"
+      CLICKHOUSE_DATABASE: crowd_check
+      CLICKHOUSE_USERNAME: crowdcheck
+      CLICKHOUSE_PASSWORD: crowdcheck
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+
+volumes:
+  clickhouse_data:
+  grafana_data:

@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import zenoh
 
-from config import ALLOWED_NODES
+from config import ALLOWED_NODES, ZENOH_LISTEN_ENDPOINT
 
 frame_queues: dict[str, queue.Queue] = {node: queue.Queue() for node in ALLOWED_NODES}
 
@@ -25,7 +25,8 @@ def _frame_handler(sample):
 
 def start_subscriber():
     conf = zenoh.Config()
+    conf.insert_json5("listen/endpoints", f'["{ZENOH_LISTEN_ENDPOINT}"]')
     session = zenoh.open(conf)
     sub = session.declare_subscriber("cme466/camera/*", _frame_handler)
-    print("Receiver Active. Waiting for frames...")
+    print(f"Receiver Active on {ZENOH_LISTEN_ENDPOINT}. Waiting for frames...")
     return session, sub

@@ -8,6 +8,7 @@ from PySide6.QtCore import QTimer
 from config import STORAGE_BASE
 from network import frame_queues
 from detection import process_frame
+from statistics import StatsBuffer
 from gui.camera_widget import CameraWidget
 from gui.theme import WINDOW_BG, GRID_MARGIN, GRID_SPACING
 
@@ -34,8 +35,10 @@ class ReceiverWindow(QMainWindow):
         self._grid.setSpacing(GRID_SPACING)
 
         self._cameras: dict[str, CameraWidget] = {}
+        self._stats_buffers: dict[str, StatsBuffer] = {}
         for node in node_names:
             self._cameras[node] = CameraWidget()
+            self._stats_buffers[node] = StatsBuffer()
 
         self._arrange_grid()
 
@@ -90,9 +93,11 @@ class ReceiverWindow(QMainWindow):
                     cv2.imwrite(str(save_dir / filename), frame)
                     print(f"[{node_name}] Processed & Archived: {filename}")
 
-                    self._display_frames[node_name] = process_frame(
-                        frame, self._body_model, self._head_model
+                    annotated, stats = process_frame(
+                        frame, self._body_model, self._head_model, node_name
                     )
+                    self._display_frames[node_name] = annotated
+                    self._stats_buffers[node_name].push(stats)
 
             except queue.Empty:
                 pass
@@ -102,6 +107,11 @@ class ReceiverWindow(QMainWindow):
 
     def closeEvent(self, event):
         self._timer.stop()
+
+        # Export all buffered statistics to CSV before shutting down
+        for node_name, buf in self._stats_buffers.items():
+            buf.export_csv(node_name, STORAGE_BASE)
+
         self._zenoh_session.close()
         print("\nShutting down receiver.")
         event.accept()

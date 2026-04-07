@@ -163,7 +163,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label,\n    argMax(latitude, updated_at) AS latitude,\n    argMax(longitude, updated_at) AS longitude\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\ntier_counts AS (\n  SELECT\n    node_id,\n    countIf(congestion_tier = 1) AS tier_1_count,\n    countIf(congestion_tier = 2) AS tier_2_count,\n    countIf(congestion_tier = 3) AS tier_3_count\n  FROM crowd_check.detections\n  WHERE $__timeFilter(timestamp)\n  GROUP BY node_id\n),\nranked_counts AS (\n  SELECT\n    node_id,\n    (tier_1_count + (2 * tier_2_count) + (3 * tier_3_count)) AS congestion_score,\n    (tier_1_count + tier_2_count + tier_3_count) AS total_detection_count\n  FROM tier_counts\n)\nSELECT\n  latest_nodes.label AS name,\n  latest_nodes.latitude AS latitude,\n  latest_nodes.longitude AS longitude,\n  ranked_counts.congestion_score AS value,\n  ranked_counts.congestion_score AS congestion_score,\n  ranked_counts.total_detection_count AS total_detection_count\nFROM ranked_counts\nINNER JOIN latest_nodes ON latest_nodes.node_id = ranked_counts.node_id\nARRAY JOIN range(least(20, greatest(1, intDiv(ranked_counts.congestion_score, 500)))) AS heat_repeat\nWHERE ranked_counts.congestion_score > 0\nORDER BY congestion_score DESC, name",
+          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label,\n    argMax(latitude, updated_at) AS latitude,\n    argMax(longitude, updated_at) AS longitude\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\nselected_nodes AS (\n  SELECT\n    node_id,\n    label,\n    latitude,\n    longitude\n  FROM latest_nodes\n  WHERE label IN (${Bus_Stop_Name:sqlstring})\n),\ntier_counts AS (\n  SELECT\n    d.node_id,\n    countIf(d.congestion_tier = 1) AS tier_1_count,\n    countIf(d.congestion_tier = 2) AS tier_2_count,\n    countIf(d.congestion_tier = 3) AS tier_3_count\n  FROM crowd_check.detections AS d\n  INNER JOIN selected_nodes ON selected_nodes.node_id = d.node_id\n  WHERE $__timeFilter(d.timestamp)\n  GROUP BY d.node_id\n),\nranked_counts AS (\n  SELECT\n    node_id,\n    (tier_1_count + (2 * tier_2_count) + (3 * tier_3_count)) AS congestion_score,\n    (tier_1_count + tier_2_count + tier_3_count) AS total_detection_count\n  FROM tier_counts\n)\nSELECT\n  selected_nodes.label AS name,\n  selected_nodes.latitude AS latitude,\n  selected_nodes.longitude AS longitude,\n  ranked_counts.congestion_score AS value,\n  ranked_counts.congestion_score AS congestion_score,\n  ranked_counts.total_detection_count AS total_detection_count\nFROM ranked_counts\nINNER JOIN selected_nodes ON selected_nodes.node_id = ranked_counts.node_id\nARRAY JOIN range(least(20, greatest(1, intDiv(ranked_counts.congestion_score, 500)))) AS heat_repeat\nWHERE ranked_counts.congestion_score > 0\nORDER BY congestion_score DESC, name",
           "refId": "A"
         },
         {
@@ -174,7 +174,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "table",
-          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label,\n    argMax(latitude, updated_at) AS latitude,\n    argMax(longitude, updated_at) AS longitude\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\ntier_counts AS (\n  SELECT\n    node_id,\n    countIf(congestion_tier = 1) AS tier_1_count,\n    countIf(congestion_tier = 2) AS tier_2_count,\n    countIf(congestion_tier = 3) AS tier_3_count\n  FROM crowd_check.detections\n  WHERE $__timeFilter(timestamp)\n  GROUP BY node_id\n),\nranked_counts AS (\n  SELECT\n    node_id,\n    tier_1_count,\n    tier_2_count,\n    tier_3_count,\n    greatest(tier_1_count, tier_2_count, tier_3_count) AS dominant_count,\n    multiIf(\n      tier_3_count >= tier_2_count AND tier_3_count >= tier_1_count, 3,\n      tier_2_count >= tier_1_count, 2,\n      1\n    ) AS dominant_tier,\n    (tier_1_count + (2 * tier_2_count) + (3 * tier_3_count)) AS congestion_score,\n    (tier_1_count + tier_2_count + tier_3_count) AS total_detection_count\n  FROM tier_counts\n)\nSELECT\n  latest_nodes.label AS name,\n  latest_nodes.latitude AS latitude,\n  latest_nodes.longitude AS longitude,\n  coalesce(ranked_counts.congestion_score, 0) AS value,\n  coalesce(ranked_counts.congestion_score, 0) AS congestion_score,\n  coalesce(ranked_counts.total_detection_count, 0) AS total_detection_count,\n  coalesce(ranked_counts.dominant_tier, 0) AS dominant_tier,\n  coalesce(ranked_counts.dominant_count, 0) AS dominant_count,\n  coalesce(ranked_counts.tier_1_count, 0) AS tier_1_count,\n  coalesce(ranked_counts.tier_2_count, 0) AS tier_2_count,\n  coalesce(ranked_counts.tier_3_count, 0) AS tier_3_count\nFROM latest_nodes\nLEFT JOIN ranked_counts ON latest_nodes.node_id = ranked_counts.node_id\nORDER BY congestion_score DESC, name",
+          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label,\n    argMax(latitude, updated_at) AS latitude,\n    argMax(longitude, updated_at) AS longitude\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\nselected_nodes AS (\n  SELECT\n    node_id,\n    label,\n    latitude,\n    longitude\n  FROM latest_nodes\n  WHERE label IN (${Bus_Stop_Name:sqlstring})\n),\ntier_counts AS (\n  SELECT\n    d.node_id,\n    countIf(d.congestion_tier = 1) AS tier_1_count,\n    countIf(d.congestion_tier = 2) AS tier_2_count,\n    countIf(d.congestion_tier = 3) AS tier_3_count\n  FROM crowd_check.detections AS d\n  INNER JOIN selected_nodes ON selected_nodes.node_id = d.node_id\n  WHERE $__timeFilter(d.timestamp)\n  GROUP BY d.node_id\n),\nranked_counts AS (\n  SELECT\n    node_id,\n    tier_1_count,\n    tier_2_count,\n    tier_3_count,\n    greatest(tier_1_count, tier_2_count, tier_3_count) AS dominant_count,\n    multiIf(\n      tier_3_count >= tier_2_count AND tier_3_count >= tier_1_count, 3,\n      tier_2_count >= tier_1_count, 2,\n      1\n    ) AS dominant_tier,\n    (tier_1_count + (2 * tier_2_count) + (3 * tier_3_count)) AS congestion_score,\n    (tier_1_count + tier_2_count + tier_3_count) AS total_detection_count\n  FROM tier_counts\n)\nSELECT\n  selected_nodes.label AS name,\n  selected_nodes.latitude AS latitude,\n  selected_nodes.longitude AS longitude,\n  coalesce(ranked_counts.congestion_score, 0) AS value,\n  coalesce(ranked_counts.congestion_score, 0) AS congestion_score,\n  coalesce(ranked_counts.total_detection_count, 0) AS total_detection_count,\n  coalesce(ranked_counts.dominant_tier, 0) AS dominant_tier,\n  coalesce(ranked_counts.dominant_count, 0) AS dominant_count,\n  coalesce(ranked_counts.tier_1_count, 0) AS tier_1_count,\n  coalesce(ranked_counts.tier_2_count, 0) AS tier_2_count,\n  coalesce(ranked_counts.tier_3_count, 0) AS tier_3_count\nFROM selected_nodes\nLEFT JOIN ranked_counts ON selected_nodes.node_id = ranked_counts.node_id\nORDER BY congestion_score DESC, name",
           "refId": "B"
         }
       ],
@@ -272,8 +272,10 @@
           },
           "editorType": "sql",
           "format": 1,
-          "queryType": "sql",
-          "rawSql": "SELECT\n  $__timeInterval(timestamp) AS time,\n  node_id AS metric,\n  avg(total_headcount) AS value\nFROM crowd_check.frame_summary\nWHERE $__timeFilter(timestamp)\nGROUP BY time, metric\nORDER BY time, metric",
+          "meta": {},
+          "pluginVersion": "4.14.0",
+          "queryType": "table",
+          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\nselected_nodes AS (\n  SELECT\n    node_id,\n    label\n  FROM latest_nodes\n  WHERE label IN (${Bus_Stop_Name:sqlstring})\n)\nSELECT\n  $__timeInterval(fs.timestamp) AS time,\n  selected_nodes.label AS metric,\n  avg(fs.total_headcount) AS value\nFROM crowd_check.frame_summary AS fs\nINNER JOIN selected_nodes ON selected_nodes.node_id = fs.node_id\nWHERE $__timeFilter(fs.timestamp)\nGROUP BY time, metric\nORDER BY time, metric",
           "refId": "A"
         }
       ],
@@ -371,7 +373,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "sql",
-          "rawSql": "SELECT\n  $__timeInterval(timestamp) AS time,\n  node_id AS metric,\n  avg(body_count) AS value\nFROM crowd_check.frame_summary\nWHERE $__timeFilter(timestamp)\nGROUP BY time, metric\nORDER BY time, metric",
+          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\nselected_nodes AS (\n  SELECT\n    node_id,\n    label\n  FROM latest_nodes\n  WHERE label IN (${Bus_Stop_Name:sqlstring})\n)\nSELECT\n  $__timeInterval(fs.timestamp) AS time,\n  selected_nodes.label AS metric,\n  avg(fs.body_count) AS value\nFROM crowd_check.frame_summary AS fs\nINNER JOIN selected_nodes ON selected_nodes.node_id = fs.node_id\nWHERE $__timeFilter(fs.timestamp)\nGROUP BY time, metric\nORDER BY time, metric",
           "refId": "A"
         }
       ],
@@ -469,7 +471,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "sql",
-          "rawSql": "SELECT\n  $__timeInterval(timestamp) AS time,\n  node_id AS metric,\n  avg(head_count) AS value\nFROM crowd_check.frame_summary\nWHERE $__timeFilter(timestamp)\nGROUP BY time, metric\nORDER BY time, metric",
+          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\nselected_nodes AS (\n  SELECT\n    node_id,\n    label\n  FROM latest_nodes\n  WHERE label IN (${Bus_Stop_Name:sqlstring})\n)\nSELECT\n  $__timeInterval(fs.timestamp) AS time,\n  selected_nodes.label AS metric,\n  avg(fs.head_count) AS value\nFROM crowd_check.frame_summary AS fs\nINNER JOIN selected_nodes ON selected_nodes.node_id = fs.node_id\nWHERE $__timeFilter(fs.timestamp)\nGROUP BY time, metric\nORDER BY time, metric",
           "refId": "A"
         }
       ],
@@ -567,7 +569,7 @@
           "editorType": "sql",
           "format": 1,
           "queryType": "sql",
-          "rawSql": "SELECT\n  $__timeInterval(timestamp) AS time,\n  concat(node_id, ' tier ', toString(congestion_tier)) AS metric,\n  count() AS value\nFROM crowd_check.detections\nWHERE $__timeFilter(timestamp)\nGROUP BY time, metric\nORDER BY time, metric",
+          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\nselected_nodes AS (\n  SELECT\n    node_id,\n    label\n  FROM latest_nodes\n  WHERE label IN (${Bus_Stop_Name:sqlstring})\n)\nSELECT\n  $__timeInterval(d.timestamp) AS time,\n  concat(selected_nodes.label, ' tier ', toString(d.congestion_tier)) AS metric,\n  count() AS value\nFROM crowd_check.detections AS d\nINNER JOIN selected_nodes ON selected_nodes.node_id = d.node_id\nWHERE $__timeFilter(d.timestamp)\nGROUP BY time, metric\nORDER BY time, metric",
           "refId": "A"
         }
       ],
@@ -583,7 +585,34 @@
     "clickhouse"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "text": [
+            "Downtown Terminal"
+          ],
+          "value": [
+            "Downtown Terminal"
+          ]
+        },
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse-main"
+        },
+        "definition": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n)\nSELECT DISTINCT label\nFROM latest_nodes\nORDER BY label",
+        "description": "The bus stop name",
+        "includeAll": true,
+        "label": "Bus Stop",
+        "multi": true,
+        "name": "Bus_Stop_Name",
+        "options": [],
+        "query": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n)\nSELECT DISTINCT label\nFROM latest_nodes\nORDER BY label",
+        "refresh": 1,
+        "regex": "",
+        "regexApplyTo": "value",
+        "type": "query"
+      }
+    ]
   },
   "time": {
     "from": "now-6h",

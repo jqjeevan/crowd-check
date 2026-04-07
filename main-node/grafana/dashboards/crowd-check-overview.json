@@ -18,10 +18,170 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": null,
   "links": [],
-  "liveNow": false,
   "panels": [
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-main"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#39FF14",
+            "mode": "thresholds"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "dark-red",
+                "value": 1
+              },
+              {
+                "color": "orange",
+                "value": 2
+              },
+              {
+                "color": "blue",
+                "value": 3
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 5,
+      "options": {
+        "basemap": {
+          "config": {},
+          "name": "Basemap",
+          "noRepeat": false,
+          "type": "default"
+        },
+        "controls": {
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showDebug": false,
+          "showMeasure": false,
+          "showScale": true,
+          "showZoom": true
+        },
+        "layers": [
+          {
+            "config": {
+              "displayTooltip": true,
+              "opacity": 1,
+              "showLegend": false,
+              "size": {
+                "fixed": 16,
+                "max": 30,
+                "min": 6
+              },
+              "style": {
+                "color": {
+                  "field": "dominant_tier",
+                  "fixed": "dark-green"
+                },
+                "opacity": 1,
+                "size": {
+                  "field": "dominant_tier",
+                  "fixed": 5,
+                  "max": 15,
+                  "min": 5
+                },
+                "symbol": {
+                  "fixed": "img/icons/marker/square.svg",
+                  "mode": "fixed"
+                }
+              },
+              "symbol": {
+                "fixed": "img/icons/marker/circle.svg",
+                "mode": "fixed"
+              },
+              "textConfig": {
+                "fontSize": 12,
+                "offsetX": 0,
+                "offsetY": 14,
+                "textAlign": "center",
+                "textBaseline": "top"
+              }
+            },
+            "filterData": {
+              "id": "byRefId",
+              "options": "B"
+            },
+            "layer-tooltip": true,
+            "location": {
+              "latitude": "latitude",
+              "longitude": "longitude",
+              "mode": "coords"
+            },
+            "name": "Bus Stops",
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": {
+          "mode": "details"
+        },
+        "view": {
+          "allLayers": true,
+          "id": "coords",
+          "lat": 52.123,
+          "lon": -106.647,
+          "noRepeat": false,
+          "zoom": 11
+        }
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-main"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label,\n    argMax(latitude, updated_at) AS latitude,\n    argMax(longitude, updated_at) AS longitude\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\ntier_counts AS (\n  SELECT\n    node_id,\n    countIf(congestion_tier = 1) AS tier_1_count,\n    countIf(congestion_tier = 2) AS tier_2_count,\n    countIf(congestion_tier = 3) AS tier_3_count\n  FROM crowd_check.detections\n  WHERE $__timeFilter(timestamp)\n  GROUP BY node_id\n),\nranked_counts AS (\n  SELECT\n    node_id,\n    (tier_1_count + (2 * tier_2_count) + (3 * tier_3_count)) AS congestion_score,\n    (tier_1_count + tier_2_count + tier_3_count) AS total_detection_count\n  FROM tier_counts\n)\nSELECT\n  latest_nodes.label AS name,\n  latest_nodes.latitude AS latitude,\n  latest_nodes.longitude AS longitude,\n  ranked_counts.congestion_score AS value,\n  ranked_counts.congestion_score AS congestion_score,\n  ranked_counts.total_detection_count AS total_detection_count\nFROM ranked_counts\nINNER JOIN latest_nodes ON latest_nodes.node_id = ranked_counts.node_id\nARRAY JOIN range(least(20, greatest(1, intDiv(ranked_counts.congestion_score, 500)))) AS heat_repeat\nWHERE ranked_counts.congestion_score > 0\nORDER BY congestion_score DESC, name",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-main"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label,\n    argMax(latitude, updated_at) AS latitude,\n    argMax(longitude, updated_at) AS longitude\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\ntier_counts AS (\n  SELECT\n    node_id,\n    countIf(congestion_tier = 1) AS tier_1_count,\n    countIf(congestion_tier = 2) AS tier_2_count,\n    countIf(congestion_tier = 3) AS tier_3_count\n  FROM crowd_check.detections\n  WHERE $__timeFilter(timestamp)\n  GROUP BY node_id\n),\nranked_counts AS (\n  SELECT\n    node_id,\n    tier_1_count,\n    tier_2_count,\n    tier_3_count,\n    greatest(tier_1_count, tier_2_count, tier_3_count) AS dominant_count,\n    multiIf(\n      tier_3_count >= tier_2_count AND tier_3_count >= tier_1_count, 3,\n      tier_2_count >= tier_1_count, 2,\n      1\n    ) AS dominant_tier,\n    (tier_1_count + (2 * tier_2_count) + (3 * tier_3_count)) AS congestion_score,\n    (tier_1_count + tier_2_count + tier_3_count) AS total_detection_count\n  FROM tier_counts\n)\nSELECT\n  latest_nodes.label AS name,\n  latest_nodes.latitude AS latitude,\n  latest_nodes.longitude AS longitude,\n  coalesce(ranked_counts.congestion_score, 0) AS value,\n  coalesce(ranked_counts.congestion_score, 0) AS congestion_score,\n  coalesce(ranked_counts.total_detection_count, 0) AS total_detection_count,\n  coalesce(ranked_counts.dominant_tier, 0) AS dominant_tier,\n  coalesce(ranked_counts.dominant_count, 0) AS dominant_count,\n  coalesce(ranked_counts.tier_1_count, 0) AS tier_1_count,\n  coalesce(ranked_counts.tier_2_count, 0) AS tier_2_count,\n  coalesce(ranked_counts.tier_3_count, 0) AS tier_3_count\nFROM latest_nodes\nLEFT JOIN ranked_counts ON latest_nodes.node_id = ranked_counts.node_id\nORDER BY congestion_score DESC, name",
+          "refId": "B"
+        }
+      ],
+      "title": "Saskatoon Bus Stop Congestion Map",
+      "transparent": true,
+      "type": "geomap"
+    },
     {
       "datasource": {
         "type": "grafana-clickhouse-datasource",
@@ -39,6 +199,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 20,
             "gradientMode": "none",
@@ -55,6 +216,7 @@
               "type": "linear"
             },
             "showPoints": "never",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -70,7 +232,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -85,7 +247,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 0
+        "y": 8
       },
       "id": 1,
       "options": {
@@ -96,10 +258,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.4.2",
       "targets": [
         {
           "datasource": {
@@ -133,6 +297,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 20,
             "gradientMode": "none",
@@ -149,6 +314,7 @@
               "type": "linear"
             },
             "showPoints": "never",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -164,7 +330,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -179,7 +345,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 0
+        "y": 8
       },
       "id": 2,
       "options": {
@@ -190,10 +356,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.4.2",
       "targets": [
         {
           "datasource": {
@@ -207,7 +375,7 @@
           "refId": "A"
         }
       ],
-      "title": "Body Count",
+      "title": "Total Body Count",
       "type": "timeseries"
     },
     {
@@ -227,6 +395,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 20,
             "gradientMode": "none",
@@ -243,6 +412,7 @@
               "type": "linear"
             },
             "showPoints": "never",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -258,7 +428,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -273,7 +443,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 8
+        "y": 16
       },
       "id": 3,
       "options": {
@@ -284,10 +454,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.4.2",
       "targets": [
         {
           "datasource": {
@@ -301,7 +473,7 @@
           "refId": "A"
         }
       ],
-      "title": "Orphan Head Count",
+      "title": "Total Orphan Head Count",
       "type": "timeseries"
     },
     {
@@ -321,6 +493,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "bars",
             "fillOpacity": 80,
             "gradientMode": "none",
@@ -337,6 +510,7 @@
               "type": "linear"
             },
             "showPoints": "never",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -352,7 +526,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -367,7 +541,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 8
+        "y": 16
       },
       "id": 4,
       "options": {
@@ -378,10 +552,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.4.2",
       "targets": [
         {
           "datasource": {
@@ -395,146 +571,13 @@
           "refId": "A"
         }
       ],
-      "title": "Congestion Histogram",
+      "title": "Total Congestion Histogram",
       "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse-main"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "#39FF14",
-            "mode": "fixed"
-          }
-          ,
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 16
-      },
-      "id": 5,
-      "options": {
-        "basemap": {
-          "config": {},
-          "name": "Basemap",
-          "type": "default"
-        },
-        "controls": {
-          "mouseWheelZoom": true,
-          "showAttribution": true,
-          "showDebug": false,
-          "showMeasure": false,
-          "showScale": true,
-          "showZoom": true
-        },
-        "layers": [
-          {
-            "config": {
-              "blur": 20,
-              "opacity": 0.55,
-              "radius": 30,
-              "showLegend": true,
-              "weight": {
-                "fixed": 1,
-                "max": 1,
-                "min": 0
-              }
-            },
-            "filterData": {
-              "id": "byRefId",
-              "options": "A"
-            },
-            "location": {
-              "latitude": "latitude",
-              "longitude": "longitude",
-              "mode": "coords"
-            },
-            "name": "Congestion Heat",
-            "tooltip": true,
-            "type": "heatmap"
-          },
-          {
-            "config": {
-              "displayTooltip": true,
-              "opacity": 1,
-              "showLegend": true,
-              "size": {
-                "fixed": 16,
-                "max": 30,
-                "min": 6
-              },
-              "symbol": {
-                "fixed": "img/icons/marker/circle.svg",
-                "mode": "fixed"
-              },
-              "textConfig": {
-                "fontSize": 12,
-                "offsetX": 0,
-                "offsetY": 14,
-                "textAlign": "center",
-                "textBaseline": "top"
-              }
-            },
-            "filterData": {
-              "id": "byRefId",
-              "options": "B"
-            },
-            "location": {
-              "latitude": "latitude",
-              "longitude": "longitude",
-              "mode": "coords"
-            },
-            "name": "Bus Stops",
-            "tooltip": true,
-            "type": "markers"
-          }
-        ],
-        "view": {
-          "id": "coords",
-          "lat": 52.123,
-          "lon": -106.647,
-          "zoom": 11
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse-main"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label,\n    argMax(latitude, updated_at) AS latitude,\n    argMax(longitude, updated_at) AS longitude\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\ntier_counts AS (\n  SELECT\n    node_id,\n    countIf(congestion_tier = 1) AS tier_1_count,\n    countIf(congestion_tier = 2) AS tier_2_count,\n    countIf(congestion_tier = 3) AS tier_3_count\n  FROM crowd_check.detections\n  WHERE $__timeFilter(timestamp)\n  GROUP BY node_id\n),\nranked_counts AS (\n  SELECT\n    node_id,\n    (tier_1_count + (2 * tier_2_count) + (3 * tier_3_count)) AS congestion_score,\n    (tier_1_count + tier_2_count + tier_3_count) AS total_detection_count\n  FROM tier_counts\n)\nSELECT\n  latest_nodes.label AS name,\n  latest_nodes.latitude AS latitude,\n  latest_nodes.longitude AS longitude,\n  ranked_counts.congestion_score AS value,\n  ranked_counts.congestion_score AS congestion_score,\n  ranked_counts.total_detection_count AS total_detection_count\nFROM ranked_counts\nINNER JOIN latest_nodes ON latest_nodes.node_id = ranked_counts.node_id\nARRAY JOIN range(least(20, greatest(1, intDiv(ranked_counts.congestion_score, 500)))) AS heat_repeat\nWHERE ranked_counts.congestion_score > 0\nORDER BY congestion_score DESC, name",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse-main"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "table",
-          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label,\n    argMax(latitude, updated_at) AS latitude,\n    argMax(longitude, updated_at) AS longitude\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\ntier_counts AS (\n  SELECT\n    node_id,\n    countIf(congestion_tier = 1) AS tier_1_count,\n    countIf(congestion_tier = 2) AS tier_2_count,\n    countIf(congestion_tier = 3) AS tier_3_count\n  FROM crowd_check.detections\n  WHERE $__timeFilter(timestamp)\n  GROUP BY node_id\n),\nranked_counts AS (\n  SELECT\n    node_id,\n    tier_1_count,\n    tier_2_count,\n    tier_3_count,\n    greatest(tier_1_count, tier_2_count, tier_3_count) AS dominant_count,\n    multiIf(\n      tier_3_count >= tier_2_count AND tier_3_count >= tier_1_count, 3,\n      tier_2_count >= tier_1_count, 2,\n      1\n    ) AS dominant_tier,\n    (tier_1_count + (2 * tier_2_count) + (3 * tier_3_count)) AS congestion_score,\n    (tier_1_count + tier_2_count + tier_3_count) AS total_detection_count\n  FROM tier_counts\n)\nSELECT\n  latest_nodes.label AS name,\n  latest_nodes.latitude AS latitude,\n  latest_nodes.longitude AS longitude,\n  coalesce(ranked_counts.congestion_score, 0) AS value,\n  coalesce(ranked_counts.congestion_score, 0) AS congestion_score,\n  coalesce(ranked_counts.total_detection_count, 0) AS total_detection_count,\n  coalesce(ranked_counts.dominant_tier, 0) AS dominant_tier,\n  coalesce(ranked_counts.dominant_count, 0) AS dominant_count,\n  coalesce(ranked_counts.tier_1_count, 0) AS tier_1_count,\n  coalesce(ranked_counts.tier_2_count, 0) AS tier_2_count,\n  coalesce(ranked_counts.tier_3_count, 0) AS tier_3_count\nFROM latest_nodes\nLEFT JOIN ranked_counts ON latest_nodes.node_id = ranked_counts.node_id\nORDER BY congestion_score DESC, name",
-          "refId": "B"
-        }
-      ],
-      "title": "Saskatoon Bus Stop Congestion Map",
-      "type": "geomap"
     }
   ],
+  "preload": false,
   "refresh": "10s",
-  "schemaVersion": 39,
-  "style": "dark",
+  "schemaVersion": 42,
   "tags": [
     "crowd-check",
     "clickhouse"
@@ -547,9 +590,9 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "",
+  "timezone": "browser",
   "title": "Crowd Check Overview",
   "uid": "crowd-check-overview",
-  "version": 2,
+  "version": 13,
   "weekStart": ""
 }

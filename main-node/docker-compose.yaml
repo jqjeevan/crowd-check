@@ -19,7 +19,7 @@ services:
     depends_on:
       - clickhouse
     environment:
-      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource,dalvany-image-panel
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       CLICKHOUSE_HOST: clickhouse
@@ -34,6 +34,15 @@ services:
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
       - ./grafana/dashboards:/var/lib/grafana/dashboards
+
+  frame-images:
+    image: nginx:alpine
+    container_name: crowd-check-frame-images
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    volumes:
+      - ./storage:/usr/share/nginx/html:ro
 
 volumes:
   clickhouse_data:

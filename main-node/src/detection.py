@@ -21,7 +21,12 @@ HEATMAP_ALPHA = 0.30
 # ------------------------------------------------------------------
 
 def process_frame(
-    frame: np.ndarray, body_model, head_model, node_id: str
+    frame: np.ndarray,
+    body_model,
+    head_model,
+    node_id: str,
+    frame_timestamp: datetime | None = None,
+    frame_id: str | None = None,
 ) -> tuple[np.ndarray, FrameStats]:
     """Run body + head detection, build congestion heatmap, and collect stats.
 
@@ -125,8 +130,10 @@ def process_frame(
     )
 
     # --- collect stats --------------------------------------------------
+    capture_time = frame_timestamp or datetime.now()
     stats = FrameStats(
-        timestamp=datetime.now().isoformat(),
+        timestamp=capture_time.isoformat(timespec="milliseconds"),
+        frame_id=frame_id or f"{node_id}-{capture_time.strftime('%Y%m%d%H%M%S%f')}",
         node_id=node_id,
         body_count=body_count,
         head_count=len(orphan_head_boxes),

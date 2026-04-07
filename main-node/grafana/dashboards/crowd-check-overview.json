@@ -611,6 +611,107 @@
       ],
       "title": "Avg Congestion Tier Breakdown",
       "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-main"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 7,
+      "options": {
+        "alt_field": "bus_stop",
+        "autofit": true,
+        "baseUrl": "",
+        "fallback": "",
+        "height": "75",
+        "icon_field": "image_url",
+        "open_url": {
+          "base_url": "",
+          "enable": true,
+          "metric_field": "image_url",
+          "open_in_tab": true,
+          "suffix": ""
+        },
+        "overlay": {
+          "bindings": {
+            "bindings": [],
+            "has_text": true,
+            "unbounded": "#66666620"
+          },
+          "field": "",
+          "height": {
+            "size": 5,
+            "unit": "%"
+          },
+          "position": "Top right",
+          "width": {
+            "size": 5,
+            "unit": "%"
+          }
+        },
+        "shared_cross_hair": {
+          "backgroundColor": "#FFFFFF10",
+          "borderColor": "#FFFFFF20"
+        },
+        "singleFill": true,
+        "slideshow": {
+          "duration": 5000,
+          "enable": false,
+          "infinite": true,
+          "pauseOnHover": true,
+          "transition": "Slide",
+          "transition_duration": 1000
+        },
+        "suffix": "",
+        "tooltip": true,
+        "tooltip_date_elapsed": false,
+        "tooltip_field": "frame_details",
+        "tooltip_include_date": true,
+        "tooltip_include_field": true,
+        "underline": {
+          "bindings": {
+            "bindings": [],
+            "has_text": true,
+            "unbounded": "#CCCCDCFF"
+          },
+          "bindings_field": "",
+          "field": "bus_stop",
+          "text_align": "center",
+          "text_size": 14
+        },
+        "width": "75"
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-main"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\nselected_nodes AS (\n  SELECT\n    node_id,\n    label\n  FROM latest_nodes\n  WHERE label IN (${Bus_Stop_Name:sqlstring})\n),\nlatest_frames AS (\n  SELECT\n    fi.node_id,\n    max(fi.timestamp) AS latest_timestamp\n  FROM crowd_check.frame_images AS fi\n  INNER JOIN selected_nodes ON selected_nodes.node_id = fi.node_id\n  WHERE fi.frame_variant = ${Frame_Variant:sqlstring}\n    AND $__timeFilter(fi.timestamp)\n  GROUP BY fi.node_id\n)\nSELECT\n  fi.timestamp AS time,\n  selected_nodes.label AS bus_stop,\n  fi.image_url AS image_url,\n  concat(\n    selected_nodes.label,\n    ' | Bodies: ', toString(fi.body_count),\n    ' | Heads: ', toString(fi.head_count),\n    ' | Total: ', toString(fi.total_headcount)\n  ) AS frame_details\nFROM crowd_check.frame_images AS fi\nINNER JOIN latest_frames\n  ON latest_frames.node_id = fi.node_id\n AND latest_frames.latest_timestamp = fi.timestamp\nINNER JOIN selected_nodes ON selected_nodes.node_id = fi.node_id\nWHERE fi.frame_variant = ${Frame_Variant:sqlstring}\nORDER BY fi.timestamp DESC, bus_stop",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest Frame View",
+      "type": "dalvany-image-panel"
     }
   ],
   "preload": false,
@@ -647,6 +748,32 @@
         "regex": "",
         "regexApplyTo": "value",
         "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "annotated",
+          "value": "annotated"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Frame Variant",
+        "multi": false,
+        "name": "Frame_Variant",
+        "options": [
+          {
+            "selected": false,
+            "text": "raw",
+            "value": "raw"
+          },
+          {
+            "selected": true,
+            "text": "annotated",
+            "value": "annotated"
+          }
+        ],
+        "query": "raw,annotated",
+        "type": "custom"
       }
     ]
   },
@@ -658,6 +785,6 @@
   "timezone": "browser",
   "title": "Crowd Check Overview",
   "uid": "crowd-check-overview",
-  "version": 19,
+  "version": 20,
   "weekStart": ""
 }

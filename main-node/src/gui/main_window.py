@@ -6,23 +6,28 @@ from PySide6.QtWidgets import QMainWindow, QWidget, QGridLayout
 from PySide6.QtCore import QTimer
 
 from config import (
+    ANNOTATED_FRAME_SUBDIR,
+    RAW_FRAME_SUBDIR,
     CLICKHOUSE_DATABASE,
     CLICKHOUSE_HOST,
     CLICKHOUSE_PASSWORD,
     CLICKHOUSE_PORT,
     CLICKHOUSE_SECURE,
     CLICKHOUSE_USERNAME,
+    SAVE_ANNOTATED_FRAMES,
+    SAVE_RAW_FRAMES,
     ENABLE_CLICKHOUSE_SINK,
     ENABLE_CSV_SINK,
     STATS_BATCH_SIZE,
     STATS_FLUSH_INTERVAL_S,
     STATS_QUEUE_MAX_SIZE,
     STORAGE_BASE,
+    build_frame_image_url,
 )
 from network import frame_queues
 from detection import process_frame
 from clickhouse_config import ClickHouseConfig
-from statistics import StatsBuffer
+from statistics import FrameImage, StatsBuffer
 from gui.camera_widget import CameraWidget
 from gui.theme import WINDOW_BG, GRID_MARGIN, GRID_SPACING
 
@@ -128,17 +133,31 @@ class ReceiverWindow(QMainWindow):
             try:
                 while True:
                     frame = frame_queues[node_name].get_nowait()
-
-                    save_dir = STORAGE_BASE / node_name
-                    save_dir.mkdir(parents=True, exist_ok=True)
-                    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                    filename = f"{timestamp}.jpg"
-                    cv2.imwrite(str(save_dir / filename), frame)
-                    print(f"[{node_name}] Processed & Archived: {filename}")
+                    capture_time = datetime.now()
+                    frame_id = f"{node_name}-{capture_time.strftime('%Y%m%d%H%M%S%f')}"
+                    filename = f"{capture_time.strftime('%Y-%m-%d_%H-%M-%S-%f')[:-3]}.jpg"
 
                     annotated, stats = process_frame(
-                        frame, self._body_model, self._head_model, node_name
+                        frame,
+                        self._body_model,
+                        self._head_model,
+                        node_name,
+                        frame_timestamp=capture_time,
+                        frame_id=frame_id,
                     )
+                    stats.frame_images = self._save_frame_variants(
+                        node_name=node_name,
+                        filename=filename,
+                        raw_frame=frame,
+                        annotated_frame=annotated,
+                    )
+
+                    if stats.frame_images:
+                        variants = ", ".join(image.frame_variant for image in stats.frame_images)
+                        print(f"[{node_name}] Processed & Archived ({variants}): {filename}")
+                    else:
+                        print(f"[{node_name}] Processed without saving image variants: {filename}")
+
                     self._display_frames[node_name] = annotated
                     self._stats_buffers[node_name].push(stats)
 
@@ -147,6 +166,39 @@ class ReceiverWindow(QMainWindow):
 
             if self._display_frames[node_name] is not None:
                 self._cameras[node_name].update_frame(self._display_frames[node_name])
+
+    def _save_frame_variants(
+        self,
+        *,
+        node_name: str,
+        filename: str,
+        raw_frame,
+        annotated_frame,
+    ) -> list[FrameImage]:
+        saved_images: list[FrameImage] = []
+
+        variant_specs = [
+            ("raw", RAW_FRAME_SUBDIR, raw_frame, SAVE_RAW_FRAMES),
+            ("annotated", ANNOTATED_FRAME_SUBDIR, annotated_frame, SAVE_ANNOTATED_FRAMES),
+        ]
+
+        for frame_variant, base_dir, image, enabled in variant_specs:
+            if not enabled:
+                continue
+
+            relative_path = base_dir / node_name / filename
+            output_path = STORAGE_BASE / relative_path
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            cv2.imwrite(str(output_path), image)
+            saved_images.append(
+                FrameImage(
+                    frame_variant=frame_variant,
+                    image_path=relative_path.as_posix(),
+                    image_url=build_frame_image_url(relative_path),
+                )
+            )
+
+        return saved_images
 
     def closeEvent(self, event):
         self._timer.stop()

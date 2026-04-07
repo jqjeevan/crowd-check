@@ -41,6 +41,11 @@ ALLOWED_NODES = [
 ZENOH_LISTEN_ENDPOINT = os.getenv("ZENOH_LISTEN_ENDPOINT", "tcp/0.0.0.0:7447")
 
 STORAGE_BASE = _env_path("STORAGE_BASE_PATH", "storage")
+FRAME_HTTP_BASE_URL = os.getenv("FRAME_HTTP_BASE_URL", "http://localhost:8081")
+SAVE_RAW_FRAMES = _env_flag("SAVE_RAW_FRAMES", True)
+SAVE_ANNOTATED_FRAMES = _env_flag("SAVE_ANNOTATED_FRAMES", True)
+RAW_FRAME_SUBDIR = Path("raw")
+ANNOTATED_FRAME_SUBDIR = Path("annotated")
 
 ENABLE_CSV_SINK = _env_flag("ENABLE_CSV_SINK", True)
 ENABLE_CLICKHOUSE_SINK = _env_flag("ENABLE_CLICKHOUSE_SINK", False)
@@ -60,3 +65,7 @@ HEAD_MODEL_PATH = "models/yolov8n-head.pt"
 HEAD_MODEL_URL = (
     "https://huggingface.co/AmineSam/irail-crowd-counting-yolov8n/resolve/main/best.pt"
 )
+
+
+def build_frame_image_url(relative_path: Path) -> str:
+    return f"{FRAME_HTTP_BASE_URL.rstrip('/')}/{relative_path.as_posix().lstrip('/')}"

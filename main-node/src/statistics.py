@@ -18,10 +18,20 @@ from clickhouse_config import ClickHouseConfig
 
 
 @dataclass
+class FrameImage:
+    """Image metadata for a single saved frame variant."""
+
+    frame_variant: str
+    image_path: str
+    image_url: str
+
+
+@dataclass
 class FrameStats:
     """All statistics collected from a single processed frame."""
 
     timestamp: str                                      # ISO 8601
+    frame_id: str
     node_id: str
     body_count: int
     head_count: int                                     # orphan heads only
@@ -29,6 +39,7 @@ class FrameStats:
     body_boxes: list[list[float]] = field(default_factory=list)   # [[x1,y1,x2,y2], ...]
     head_boxes: list[list[float]] = field(default_factory=list)   # orphan heads
     congestion_tiers: dict[int, int] = field(default_factory=dict)
+    frame_images: list[FrameImage] = field(default_factory=list)
     # key = detection index (bodies first, then heads), value = tier (1/2/3)
 
 
@@ -195,6 +206,7 @@ class StatsBuffer:
         batch_ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self._write_frame_summary(items, stats_dir, batch_ts)
         self._write_detections(items, stats_dir, batch_ts)
+        self._write_frame_images(items, stats_dir, batch_ts)
 
     def _flush_clickhouse_batch(self, items: list[FrameStats]) -> None:
         if not items:
@@ -203,11 +215,13 @@ class StatsBuffer:
         client = self._get_clickhouse_client()
         frame_rows = []
         detection_rows = []
+        image_rows = []
 
         for stats in items:
             ts = datetime.fromisoformat(stats.timestamp)
             frame_rows.append([
                 ts,
+                stats.frame_id,
                 stats.node_id,
                 stats.body_count,
                 stats.head_count,
@@ -218,6 +232,7 @@ class StatsBuffer:
             for box in stats.body_boxes:
                 detection_rows.append([
                     ts,
+                    stats.frame_id,
                     stats.node_id,
                     "body",
                     float(box[0]),
@@ -231,6 +246,7 @@ class StatsBuffer:
             for box in stats.head_boxes:
                 detection_rows.append([
                     ts,
+                    stats.frame_id,
                     stats.node_id,
                     "head",
                     float(box[0]),
@@ -241,12 +257,26 @@ class StatsBuffer:
                 ])
                 idx += 1
 
+            for image in stats.frame_images:
+                image_rows.append([
+                    ts,
+                    stats.frame_id,
+                    stats.node_id,
+                    image.frame_variant,
+                    image.image_path,
+                    image.image_url,
+                    stats.body_count,
+                    stats.head_count,
+                    stats.total_headcount,
+                ])
+
         client.insert(
             "frame_summary",
             frame_rows,
             database=self._clickhouse_config.database,
             column_names=[
                 "timestamp",
+                "frame_id",
                 "node_id",
                 "body_count",
                 "head_count",
@@ -261,6 +291,7 @@ class StatsBuffer:
                 database=self._clickhouse_config.database,
                 column_names=[
                     "timestamp",
+                    "frame_id",
                     "node_id",
                     "box_type",
                     "x1",
@@ -268,6 +299,24 @@ class StatsBuffer:
                     "x2",
                     "y2",
                     "congestion_tier",
+                ],
+            )
+
+        if image_rows:
+            client.insert(
+                "frame_images",
+                image_rows,
+                database=self._clickhouse_config.database,
+                column_names=[
+                    "timestamp",
+                    "frame_id",
+                    "node_id",
+                    "frame_variant",
+                    "image_path",
+                    "image_url",
+                    "body_count",
+                    "head_count",
+                    "total_headcount",
                 ],
             )
 
@@ -293,12 +342,13 @@ class StatsBuffer:
         with open(path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow([
-                "timestamp", "node_id",
+                "timestamp", "frame_id", "node_id",
                 "body_count", "head_count", "total_headcount",
             ])
             for stats in items:
                 writer.writerow([
                     stats.timestamp,
+                    stats.frame_id,
                     stats.node_id,
                     stats.body_count,
                     stats.head_count,
@@ -316,7 +366,7 @@ class StatsBuffer:
         with open(path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow([
-                "timestamp", "node_id", "box_type",
+                "timestamp", "frame_id", "node_id", "box_type",
                 "x1", "y1", "x2", "y2", "congestion_tier",
             ])
             for stats in items:
@@ -325,6 +375,7 @@ class StatsBuffer:
                     tier = stats.congestion_tiers.get(idx, 0)
                     writer.writerow([
                         stats.timestamp,
+                        stats.frame_id,
                         stats.node_id,
                         "body",
                         *[f"{value:.1f}" for value in box],
@@ -335,6 +386,7 @@ class StatsBuffer:
                     tier = stats.congestion_tiers.get(idx, 3)
                     writer.writerow([
                         stats.timestamp,
+                        stats.frame_id,
                         stats.node_id,
                         "head",
                         *[f"{value:.1f}" for value in box],
@@ -342,3 +394,38 @@ class StatsBuffer:
                     ])
                     idx += 1
         print(f"[{self._node_id}] Exported detections   -> {path}")
+
+    def _write_frame_images(
+        self,
+        items: list[FrameStats],
+        out_dir: Path,
+        batch_ts: str,
+    ) -> None:
+        path = out_dir / f"frame_images_{batch_ts}.csv"
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "timestamp",
+                "frame_id",
+                "node_id",
+                "frame_variant",
+                "image_path",
+                "image_url",
+                "body_count",
+                "head_count",
+                "total_headcount",
+            ])
+            for stats in items:
+                for image in stats.frame_images:
+                    writer.writerow([
+                        stats.timestamp,
+                        stats.frame_id,
+                        stats.node_id,
+                        image.frame_variant,
+                        image.image_path,
+                        image.image_url,
+                        stats.body_count,
+                        stats.head_count,
+                        stats.total_headcount,
+                    ])
+        print(f"[{self._node_id}] Exported frame images -> {path}")

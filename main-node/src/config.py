@@ -1,4 +1,5 @@
 import os
+import json
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -20,7 +21,23 @@ def _env_path(name: str, default: str) -> Path:
     return Path(__file__).parent.parent / raw_path
 
 
-ALLOWED_NODES = [n.strip() for n in os.getenv("ALLOWED_NODES", "").split(",") if n.strip()]
+def _load_camera_catalog() -> dict[str, dict[str, float | str]]:
+    catalog_path = Path(__file__).resolve().parents[2] / "camera_nodes.json"
+    if not catalog_path.exists():
+        return {}
+
+    with open(catalog_path, encoding="utf-8") as f:
+        raw_catalog = json.load(f)
+
+    return {str(node_id): dict(spec) for node_id, spec in raw_catalog.items()}
+
+
+CAMERA_CATALOG = _load_camera_catalog()
+DEFAULT_ALLOWED_NODES = list(CAMERA_CATALOG)
+ALLOWED_NODES = [
+    n.strip() for n in os.getenv("ALLOWED_NODES", ",".join(DEFAULT_ALLOWED_NODES)).split(",")
+    if n.strip()
+]
 ZENOH_LISTEN_ENDPOINT = os.getenv("ZENOH_LISTEN_ENDPOINT", "tcp/0.0.0.0:7447")
 
 STORAGE_BASE = _env_path("STORAGE_BASE_PATH", "storage")

@@ -14,6 +14,8 @@ try:
 except ImportError:  # pragma: no cover - import is validated by config/dependency setup
     clickhouse_connect = None
 
+from clickhouse_config import ClickHouseConfig
+
 
 @dataclass
 class FrameStats:
@@ -28,16 +30,6 @@ class FrameStats:
     head_boxes: list[list[float]] = field(default_factory=list)   # orphan heads
     congestion_tiers: dict[int, int] = field(default_factory=dict)
     # key = detection index (bodies first, then heads), value = tier (1/2/3)
-
-
-@dataclass(frozen=True)
-class ClickHouseConfig:
-    host: str
-    port: int
-    database: str
-    username: str
-    password: str
-    secure: bool = False
 
 
 @dataclass

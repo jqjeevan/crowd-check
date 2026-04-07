@@ -1,9 +1,11 @@
 import os
 import argparse
+import json
 import cv2
 import zenoh
 import time
 from dotenv import load_dotenv
+from datetime import datetime
 from pathlib import Path
 from ultralytics import YOLO
 
@@ -11,6 +13,20 @@ load_dotenv()
 
 FILTER_MODEL_NAME = "models/yolo26n.pt"
 PERSON_CLASS_ID = 0  # COCO class 0 = person
+CAMERA_CATALOG_PATH = Path(__file__).resolve().parents[2] / "camera_nodes.json"
+
+
+def load_camera_catalog() -> dict[str, dict[str, float | str]]:
+    if not CAMERA_CATALOG_PATH.exists():
+        return {}
+
+    with open(CAMERA_CATALOG_PATH, encoding="utf-8") as f:
+        raw_catalog = json.load(f)
+
+    return {str(node_id): dict(spec) for node_id, spec in raw_catalog.items()}
+
+
+CAMERA_CATALOG = load_camera_catalog()
 
 
 def load_filter_model() -> YOLO:
@@ -70,6 +86,18 @@ def parse_args():
         help="Node ID (default: from .env)",
     )
     parser.add_argument(
+        "--latitude",
+        type=float,
+        default=None,
+        help="Latitude for this camera node (default: from .env or camera catalog)",
+    )
+    parser.add_argument(
+        "--longitude",
+        type=float,
+        default=None,
+        help="Longitude for this camera node (default: from .env or camera catalog)",
+    )
+    parser.add_argument(
         "--folders",
         nargs="+",
         default=["test_058", "test_059"],
@@ -89,12 +117,62 @@ def parse_args():
     return parser.parse_args()
 
 
+def resolve_camera_metadata(
+    node_id: str,
+    latitude: float | None,
+    longitude: float | None,
+) -> tuple[str, float, float]:
+    catalog_entry = CAMERA_CATALOG.get(node_id, {})
+    label = str(catalog_entry.get("label", node_id))
+
+    if latitude is None:
+        raw_latitude = os.getenv("NODE_LATITUDE")
+        if raw_latitude:
+            latitude = float(raw_latitude)
+        elif "latitude" in catalog_entry:
+            latitude = float(catalog_entry["latitude"])
+
+    if longitude is None:
+        raw_longitude = os.getenv("NODE_LONGITUDE")
+        if raw_longitude:
+            longitude = float(raw_longitude)
+        elif "longitude" in catalog_entry:
+            longitude = float(catalog_entry["longitude"])
+
+    if latitude is None or longitude is None:
+        raise ValueError(
+            f"Camera coordinates are required for {node_id}. Set NODE_LATITUDE/NODE_LONGITUDE "
+            "or use one of the catalog camera names."
+        )
+
+    return label, latitude, longitude
+
+
+def publish_camera_metadata(meta_pub, node_id: str, label: str, latitude: float, longitude: float):
+    payload = json.dumps(
+        {
+            "node_id": node_id,
+            "label": label,
+            "latitude": latitude,
+            "longitude": longitude,
+            "announced_at": datetime.now().isoformat(),
+        }
+    )
+    meta_pub.put(payload.encode("utf-8"))
+    print(f"Published camera metadata for {node_id} ({latitude:.6f}, {longitude:.6f})")
+
+
 def main():
     args = parse_args()
     NODE_ID = args.node_id
     MAIN_NODE_IP = os.getenv("MAIN_NODE_IP")
     DATASET_PATH = Path(os.getenv("DATASET_PATH")).resolve()
     TARGET_FOLDERS = args.folders
+    label, latitude, longitude = resolve_camera_metadata(
+        NODE_ID,
+        args.latitude,
+        args.longitude,
+    )
 
     # Load the YOLO26n filter model unless disabled
     filter_model = None
@@ -111,11 +189,14 @@ def main():
 
     session = zenoh.open(conf)
     pub = session.declare_publisher(f"cme466/camera/{NODE_ID}")
+    meta_pub = session.declare_publisher(f"cme466/camera-meta/{NODE_ID}")
+    publish_camera_metadata(meta_pub, NODE_ID, label, latitude, longitude)
 
     print(f"Node {NODE_ID} streaming at 1 frame per second. Press Ctrl+C to stop.")
 
     sent_count = 0
     skipped_count = 0
+    last_metadata_publish = time.monotonic()
 
     try:
         for folder in TARGET_FOLDERS:
@@ -130,6 +211,10 @@ def main():
                 frame = cv2.imread(str(img_path))
                 if frame is None:
                     continue
+
+                if time.monotonic() - last_metadata_publish >= 30:
+                    publish_camera_metadata(meta_pub, NODE_ID, label, latitude, longitude)
+                    last_metadata_publish = time.monotonic()
 
                 # Apply person-detection filter before sending
                 if filter_model is not None:

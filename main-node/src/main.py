@@ -13,10 +13,17 @@ def main():
     ensure_models_exist()
     body_model, head_model = load_models()
 
-    session, sub = start_subscriber()
+    session, subscribers, camera_registry = start_subscriber()
 
     app = QApplication(sys.argv)
-    window = ReceiverWindow(ALLOWED_NODES, body_model, head_model, session, sub)
+    window = ReceiverWindow(
+        ALLOWED_NODES,
+        body_model,
+        head_model,
+        session,
+        subscribers,
+        camera_registry,
+    )
     window.show()
     sys.exit(app.exec())
 

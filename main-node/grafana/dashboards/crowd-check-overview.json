@@ -397,6 +397,139 @@
       ],
       "title": "Congestion Histogram",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-main"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#39FF14",
+            "mode": "fixed"
+          }
+          ,
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "options": {
+        "basemap": {
+          "config": {},
+          "name": "Basemap",
+          "type": "default"
+        },
+        "controls": {
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showDebug": false,
+          "showMeasure": false,
+          "showScale": true,
+          "showZoom": true
+        },
+        "layers": [
+          {
+            "config": {
+              "blur": 20,
+              "opacity": 0.55,
+              "radius": 30,
+              "showLegend": true,
+              "weight": {
+                "fixed": 1,
+                "max": 1,
+                "min": 0
+              }
+            },
+            "filterData": {
+              "id": "byRefId",
+              "options": "A"
+            },
+            "location": {
+              "latitude": "latitude",
+              "longitude": "longitude",
+              "mode": "coords"
+            },
+            "name": "Congestion Heat",
+            "tooltip": true,
+            "type": "heatmap"
+          },
+          {
+            "config": {
+              "displayTooltip": true,
+              "opacity": 1,
+              "showLegend": true,
+              "size": {
+                "fixed": 16,
+                "max": 30,
+                "min": 6
+              },
+              "symbol": {
+                "fixed": "img/icons/marker/circle.svg",
+                "mode": "fixed"
+              },
+              "textConfig": {
+                "fontSize": 12,
+                "offsetX": 0,
+                "offsetY": 14,
+                "textAlign": "center",
+                "textBaseline": "top"
+              }
+            },
+            "filterData": {
+              "id": "byRefId",
+              "options": "B"
+            },
+            "location": {
+              "latitude": "latitude",
+              "longitude": "longitude",
+              "mode": "coords"
+            },
+            "name": "Bus Stops",
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "view": {
+          "id": "coords",
+          "lat": 52.123,
+          "lon": -106.647,
+          "zoom": 11
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-main"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label,\n    argMax(latitude, updated_at) AS latitude,\n    argMax(longitude, updated_at) AS longitude\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\ntier_counts AS (\n  SELECT\n    node_id,\n    countIf(congestion_tier = 1) AS tier_1_count,\n    countIf(congestion_tier = 2) AS tier_2_count,\n    countIf(congestion_tier = 3) AS tier_3_count\n  FROM crowd_check.detections\n  WHERE $__timeFilter(timestamp)\n  GROUP BY node_id\n),\nranked_counts AS (\n  SELECT\n    node_id,\n    (tier_1_count + (2 * tier_2_count) + (3 * tier_3_count)) AS congestion_score,\n    (tier_1_count + tier_2_count + tier_3_count) AS total_detection_count\n  FROM tier_counts\n)\nSELECT\n  latest_nodes.label AS name,\n  latest_nodes.latitude AS latitude,\n  latest_nodes.longitude AS longitude,\n  ranked_counts.congestion_score AS value,\n  ranked_counts.congestion_score AS congestion_score,\n  ranked_counts.total_detection_count AS total_detection_count\nFROM ranked_counts\nINNER JOIN latest_nodes ON latest_nodes.node_id = ranked_counts.node_id\nARRAY JOIN range(least(20, greatest(1, intDiv(ranked_counts.congestion_score, 500)))) AS heat_repeat\nWHERE ranked_counts.congestion_score > 0\nORDER BY congestion_score DESC, name",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-main"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label,\n    argMax(latitude, updated_at) AS latitude,\n    argMax(longitude, updated_at) AS longitude\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\ntier_counts AS (\n  SELECT\n    node_id,\n    countIf(congestion_tier = 1) AS tier_1_count,\n    countIf(congestion_tier = 2) AS tier_2_count,\n    countIf(congestion_tier = 3) AS tier_3_count\n  FROM crowd_check.detections\n  WHERE $__timeFilter(timestamp)\n  GROUP BY node_id\n),\nranked_counts AS (\n  SELECT\n    node_id,\n    tier_1_count,\n    tier_2_count,\n    tier_3_count,\n    greatest(tier_1_count, tier_2_count, tier_3_count) AS dominant_count,\n    multiIf(\n      tier_3_count >= tier_2_count AND tier_3_count >= tier_1_count, 3,\n      tier_2_count >= tier_1_count, 2,\n      1\n    ) AS dominant_tier,\n    (tier_1_count + (2 * tier_2_count) + (3 * tier_3_count)) AS congestion_score,\n    (tier_1_count + tier_2_count + tier_3_count) AS total_detection_count\n  FROM tier_counts\n)\nSELECT\n  latest_nodes.label AS name,\n  latest_nodes.latitude AS latitude,\n  latest_nodes.longitude AS longitude,\n  coalesce(ranked_counts.congestion_score, 0) AS value,\n  coalesce(ranked_counts.congestion_score, 0) AS congestion_score,\n  coalesce(ranked_counts.total_detection_count, 0) AS total_detection_count,\n  coalesce(ranked_counts.dominant_tier, 0) AS dominant_tier,\n  coalesce(ranked_counts.dominant_count, 0) AS dominant_count,\n  coalesce(ranked_counts.tier_1_count, 0) AS tier_1_count,\n  coalesce(ranked_counts.tier_2_count, 0) AS tier_2_count,\n  coalesce(ranked_counts.tier_3_count, 0) AS tier_3_count\nFROM latest_nodes\nLEFT JOIN ranked_counts ON latest_nodes.node_id = ranked_counts.node_id\nORDER BY congestion_score DESC, name",
+          "refId": "B"
+        }
+      ],
+      "title": "Saskatoon Bus Stop Congestion Map",
+      "type": "geomap"
     }
   ],
   "refresh": "10s",
@@ -417,6 +550,6 @@
   "timezone": "",
   "title": "Crowd Check Overview",
   "uid": "crowd-check-overview",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

@@ -21,14 +21,23 @@ from config import (
 )
 from network import frame_queues
 from detection import process_frame
-from statistics import ClickHouseConfig, StatsBuffer
+from clickhouse_config import ClickHouseConfig
+from statistics import StatsBuffer
 from gui.camera_widget import CameraWidget
 from gui.theme import WINDOW_BG, GRID_MARGIN, GRID_SPACING
 
 
 class ReceiverWindow(QMainWindow):
 
-    def __init__(self, node_names, body_model, head_model, zenoh_session, zenoh_sub):
+    def __init__(
+        self,
+        node_names,
+        body_model,
+        head_model,
+        zenoh_session,
+        zenoh_subscribers,
+        camera_registry,
+    ):
         super().__init__()
         self.setWindowTitle("Crowd Check")
         self.setStyleSheet(f"QMainWindow {{ background-color: {WINDOW_BG}; }}")
@@ -36,7 +45,8 @@ class ReceiverWindow(QMainWindow):
         self._body_model = body_model
         self._head_model = head_model
         self._zenoh_session = zenoh_session
-        self._zenoh_sub = zenoh_sub
+        self._zenoh_subscribers = zenoh_subscribers
+        self._camera_registry = camera_registry
         self._node_names = node_names
 
         central = QWidget()
@@ -144,6 +154,9 @@ class ReceiverWindow(QMainWindow):
         for node_name, buf in self._stats_buffers.items():
             print(f"[{node_name}] Draining statistics queue before shutdown.")
             buf.close()
+
+        if self._camera_registry is not None:
+            self._camera_registry.close()
 
         self._zenoh_session.close()
         print("\nShutting down receiver.")

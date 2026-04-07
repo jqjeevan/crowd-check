@@ -1,0 +1,27 @@
+{
+  "market_mall": {
+    "label": "Market Mall",
+    "latitude": 52.100357,
+    "longitude": -106.620529
+  },
+  "centre_mall": {
+    "label": "Centre Mall",
+    "latitude": 52.112446,
+    "longitude": -106.597977
+  },
+  "place_reil": {
+    "label": "Place Reil",
+    "latitude": 52.130485,
+    "longitude": -106.636751
+  },
+  "downtown_terminal": {
+    "label": "Downtown Terminal",
+    "latitude": 52.130107,
+    "longitude": -106.66193
+  },
+  "confederation_mall": {
+    "label": "Confederation Mall",
+    "latitude": 52.133809,
+    "longitude": -106.721778
+  }
+}

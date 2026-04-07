@@ -6,7 +6,8 @@ providers:
     folder: Crowd Check
     type: file
     disableDeletion: false
-    editable: true
-    updateIntervalSeconds: 10
+    editable: false
+    allowUiUpdates: false
+    updateIntervalSeconds: 5
     options:
       path: /var/lib/grafana/dashboards

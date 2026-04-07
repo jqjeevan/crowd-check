@@ -104,7 +104,7 @@
                 },
                 "opacity": 1,
                 "size": {
-                  "field": "dominant_tier",
+                  "field": "total_detection_count",
                   "fixed": 5,
                   "max": 15,
                   "min": 5
@@ -217,15 +217,16 @@
             },
             "showPoints": "never",
             "showValues": false,
-            "spanNulls": false,
+            "spanNulls": 30000,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
             }
           },
+          "displayName": "${__field.labels.metric}",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -271,15 +272,15 @@
             "uid": "clickhouse-main"
           },
           "editorType": "sql",
-          "format": 1,
+          "format": 0,
           "meta": {},
           "pluginVersion": "4.14.0",
-          "queryType": "table",
+          "queryType": "timeseries",
           "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\nselected_nodes AS (\n  SELECT\n    node_id,\n    label\n  FROM latest_nodes\n  WHERE label IN (${Bus_Stop_Name:sqlstring})\n)\nSELECT\n  $__timeInterval(fs.timestamp) AS time,\n  selected_nodes.label AS metric,\n  avg(fs.total_headcount) AS value\nFROM crowd_check.frame_summary AS fs\nINNER JOIN selected_nodes ON selected_nodes.node_id = fs.node_id\nWHERE $__timeFilter(fs.timestamp)\nGROUP BY time, metric\nORDER BY time, metric",
           "refId": "A"
         }
       ],
-      "title": "Total Headcount",
+      "title": "Headcount",
       "type": "timeseries"
     },
     {
@@ -317,15 +318,16 @@
             },
             "showPoints": "never",
             "showValues": false,
-            "spanNulls": false,
+            "spanNulls": 30000,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
             }
           },
+          "displayName": "${__field.labels.metric}",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -371,13 +373,15 @@
             "uid": "clickhouse-main"
           },
           "editorType": "sql",
-          "format": 1,
-          "queryType": "sql",
+          "format": 0,
+          "meta": {},
+          "pluginVersion": "4.14.0",
+          "queryType": "timeseries",
           "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\nselected_nodes AS (\n  SELECT\n    node_id,\n    label\n  FROM latest_nodes\n  WHERE label IN (${Bus_Stop_Name:sqlstring})\n)\nSELECT\n  $__timeInterval(fs.timestamp) AS time,\n  selected_nodes.label AS metric,\n  avg(fs.body_count) AS value\nFROM crowd_check.frame_summary AS fs\nINNER JOIN selected_nodes ON selected_nodes.node_id = fs.node_id\nWHERE $__timeFilter(fs.timestamp)\nGROUP BY time, metric\nORDER BY time, metric",
           "refId": "A"
         }
       ],
-      "title": "Total Body Count",
+      "title": "Body Count",
       "type": "timeseries"
     },
     {
@@ -415,15 +419,16 @@
             },
             "showPoints": "never",
             "showValues": false,
-            "spanNulls": false,
+            "spanNulls": 30000,
             "stacking": {
               "group": "A",
-              "mode": "none"
+              "mode": "normal"
             },
             "thresholdsStyle": {
               "mode": "off"
             }
           },
+          "displayName": "${__field.labels.metric}",
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -469,111 +474,15 @@
             "uid": "clickhouse-main"
           },
           "editorType": "sql",
-          "format": 1,
-          "queryType": "sql",
+          "format": 0,
+          "meta": {},
+          "pluginVersion": "4.14.0",
+          "queryType": "timeseries",
           "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\nselected_nodes AS (\n  SELECT\n    node_id,\n    label\n  FROM latest_nodes\n  WHERE label IN (${Bus_Stop_Name:sqlstring})\n)\nSELECT\n  $__timeInterval(fs.timestamp) AS time,\n  selected_nodes.label AS metric,\n  avg(fs.head_count) AS value\nFROM crowd_check.frame_summary AS fs\nINNER JOIN selected_nodes ON selected_nodes.node_id = fs.node_id\nWHERE $__timeFilter(fs.timestamp)\nGROUP BY time, metric\nORDER BY time, metric",
           "refId": "A"
         }
       ],
-      "title": "Total Orphan Head Count",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse-main"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "bars",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 0,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "showValues": false,
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "normal"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
-      "id": 4,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "hideZeros": false,
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "12.4.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse-main"
-          },
-          "editorType": "sql",
-          "format": 1,
-          "queryType": "sql",
-          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\nselected_nodes AS (\n  SELECT\n    node_id,\n    label\n  FROM latest_nodes\n  WHERE label IN (${Bus_Stop_Name:sqlstring})\n)\nSELECT\n  $__timeInterval(d.timestamp) AS time,\n  concat(selected_nodes.label, ' tier ', toString(d.congestion_tier)) AS metric,\n  count() AS value\nFROM crowd_check.detections AS d\nINNER JOIN selected_nodes ON selected_nodes.node_id = d.node_id\nWHERE $__timeFilter(d.timestamp)\nGROUP BY time, metric\nORDER BY time, metric",
-          "refId": "A"
-        }
-      ],
-      "title": "Total Congestion Histogram",
+      "title": "Orphan Head Count",
       "type": "timeseries"
     }
   ],
@@ -622,6 +531,6 @@
   "timezone": "browser",
   "title": "Crowd Check Overview",
   "uid": "crowd-check-overview",
-  "version": 13,
+  "version": 15,
   "weekStart": ""
 }

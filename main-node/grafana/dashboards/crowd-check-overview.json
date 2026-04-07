@@ -39,6 +39,13 @@
             }
           },
           "fieldMinMax": false,
+          "links": [
+            {
+              "targetBlank": false,
+              "title": "Filter dashboard to ${__data.fields.name}",
+              "url": "/d/crowd-check-overview/crowd-check-overview?var-Bus_Stop_Name=${__data.fields.name}&from=${__from}&to=${__to}"
+            }
+          ],
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -484,6 +491,126 @@
       ],
       "title": "Orphan Head Count",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-main"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tier 1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tier 2"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#FFB300",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tier 3"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 6,
+      "options": {
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "sort": "desc",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-main"
+          },
+          "editorType": "sql",
+          "format": 1,
+          "queryType": "table",
+          "rawSql": "WITH latest_nodes AS (\n  SELECT\n    node_id,\n    argMax(label, updated_at) AS label\n  FROM crowd_check.camera_nodes\n  GROUP BY node_id\n),\nselected_nodes AS (\n  SELECT\n    node_id,\n    label\n  FROM latest_nodes\n  WHERE label IN (${Bus_Stop_Name:sqlstring})\n),\ntier_counts_by_timestamp AS (\n  SELECT\n    d.timestamp,\n    d.node_id,\n    countIf(d.congestion_tier = 1) AS tier_1_count,\n    countIf(d.congestion_tier = 2) AS tier_2_count,\n    countIf(d.congestion_tier = 3) AS tier_3_count\n  FROM crowd_check.detections AS d\n  INNER JOIN selected_nodes ON selected_nodes.node_id = d.node_id\n  WHERE $__timeFilter(d.timestamp)\n  GROUP BY d.timestamp, d.node_id\n),\nselected_tier_totals_by_timestamp AS (\n  SELECT\n    timestamp,\n    sum(tier_1_count) AS tier_1_total,\n    sum(tier_2_count) AS tier_2_total,\n    sum(tier_3_count) AS tier_3_total\n  FROM tier_counts_by_timestamp\n  GROUP BY timestamp\n),\naverage_tier_totals AS (\n  SELECT\n    coalesce(avg(tier_1_total), 0) AS tier_1_avg,\n    coalesce(avg(tier_2_total), 0) AS tier_2_avg,\n    coalesce(avg(tier_3_total), 0) AS tier_3_avg\n  FROM selected_tier_totals_by_timestamp\n)\nSELECT\n  tier_name,\n  tier_count\nFROM (\n  SELECT\n    'Tier 1' AS tier_name,\n    tier_1_avg AS tier_count,\n    1 AS sort_order\n  FROM average_tier_totals\n\n  UNION ALL\n\n  SELECT\n    'Tier 2' AS tier_name,\n    tier_2_avg AS tier_count,\n    2 AS sort_order\n  FROM average_tier_totals\n\n  UNION ALL\n\n  SELECT\n    'Tier 3' AS tier_name,\n    tier_3_avg AS tier_count,\n    3 AS sort_order\n  FROM average_tier_totals\n)\nORDER BY sort_order",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg Congestion Tier Breakdown",
+      "type": "piechart"
     }
   ],
   "preload": false,
@@ -531,6 +658,6 @@
   "timezone": "browser",
   "title": "Crowd Check Overview",
   "uid": "crowd-check-overview",
-  "version": 15,
+  "version": 19,
   "weekStart": ""
 }
